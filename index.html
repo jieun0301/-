@@ -161,9 +161,21 @@
             buttons.forEach(icon => icon.innerText = isGlobalMuted ? 'volume_off' : 'volume_up');
         }
 
+        // 영상이 끝나면 다음 섹션으로, 마지막이면 처음으로!
         function autoNext(v) {
-            const next = v.closest('.video-section').nextElementSibling;
-            if (next) next.scrollIntoView({ behavior: 'smooth' });
+            const currentSection = v.closest('.video-section');
+            const nextSection = currentSection.nextElementSibling;
+            
+            if (nextSection) {
+                // 다음 영상이 있으면 다음으로 이동
+                nextSection.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                // [추가] 마지막 영상이면 맨 위 첫 번째 영상으로 부드럽게 이동
+                const firstSection = document.querySelector('.video-section');
+                if (firstSection) {
+                    firstSection.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
         }
 
         function setupObserver() {
