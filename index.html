@@ -9,37 +9,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: black; font-family: 'Roboto', sans-serif; -webkit-font-smoothing: antialiased; }
-        
         .video-container { 
-            height: 100dvh; 
-            scroll-snap-type: y mandatory; 
-            overflow-y: scroll; 
-            scrollbar-width: none; 
-            -ms-overflow-style: none;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
+            height: 100dvh; scroll-snap-type: y mandatory; overflow-y: scroll; 
+            scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;
         }
         .video-container::-webkit-scrollbar { display: none; }
-
         .video-section { 
-            height: 100dvh; 
-            scroll-snap-align: start; 
-            scroll-snap-stop: always; /* 가속도 붙어도 무조건 다음 칸에서 멈춤 */
-            position: relative; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            background: black; 
+            height: 100dvh; scroll-snap-align: start; scroll-snap-stop: always; 
+            position: relative; display: flex; align-items: center; justify-content: center; background: black; 
         }
-
-        video { 
-            max-height: 100%; 
-            max-width: 100%; 
-            object-fit: contain; 
-            background: black; 
-            pointer-events: none; /* 클릭 이벤트를 부모 section에서 처리하도록 설정 */
-        }
-        
+        video { max-height: 100%; max-width: 100%; object-fit: contain; background: black; pointer-events: none; }
         .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400; color: white; font-size: 28px; }
         .side-btn {
             width: 54px; height: 54px; background: rgba(255, 255, 255, 0.1); 
@@ -51,7 +30,7 @@
 <body>
 
     <div class="video-container" id="feed">
-        <div class="text-white flex items-center justify-center h-full text-xs opacity-40 uppercase tracking-widest">Optimizing Feed...</div>
+        <div class="text-white flex items-center justify-center h-full text-xs opacity-40 uppercase tracking-widest">Fixing Loop Logic...</div>
     </div>
 
     <div id="controls" class="fixed bottom-24 right-6 flex flex-col gap-5 z-50">
@@ -66,7 +45,7 @@
             <input type="file" id="videoInput" accept="video/*" class="mb-6 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-6 file:rounded-full file:border-0 file:bg-[#D0BCFF] file:text-[#381E72]">
             <div class="flex gap-3">
                 <button onclick="uploadVideo()" id="uploadBtn" class="flex-1 bg-[#D0BCFF] text-[#381E72] py-4 rounded-full font-bold">Upload</button>
-                <button onclick="closeModal()" class="flex-1 bg-[#49454F] py-4 rounded-full font-bold">Close</button>
+                <button onclick="closeModal()" class="flex-1 bg-[#49454F] py-4 rounded-full font-bold text-white">Close</button>
             </div>
             <div id="status" class="mt-4 text-xs text-center text-[#D0BCFF]"></div>
         </div>
@@ -80,13 +59,12 @@
         let isAdmin = false;
         let isGlobalMuted = true;
         let currentVideoData = { url: '', name: '' };
-        let isScrolling = false; // 스크롤 중인지 체크하는 플래그
+        let isAutoLooping = false; // [핵심] 처음으로 돌아가는 중인지 체크
 
         async function loadVideos() {
             const feed = document.getElementById('feed');
             const { data, error } = await s_client.storage.from('videos').list();
             if (error) return;
-
             const shuffled = data.filter(f => f.name !== '.emptyFolderPlaceholder').sort(() => Math.random() - 0.5);
             feed.innerHTML = '';
             shuffled.forEach(file => {
@@ -100,21 +78,23 @@
             const feed = document.getElementById('feed');
             const section = document.createElement('div');
             section.className = 'video-section';
-            section.onclick = function() { vHandleTouch(this.querySelector('video')); }; // 섹션 클릭으로 변경
+            section.onclick = function() { vHandleTouch(this.querySelector('video')); };
             section.innerHTML = `
                 <video data-src="${url}" data-name="${fileName}" playsinline muted preload="metadata" onended="autoNext(this)"></video>
-                ${isAdmin ? `<button onclick="event.stopPropagation(); deleteVideo('${fileName}')" class="absolute top-10 right-6 bg-[#F2B8B5] text-[#601410] px-5 py-2 rounded-full text-xs font-bold z-50 flex items-center gap-1 shadow-xl"><span class="material-symbols-rounded" style="font-size: 18px;">delete</span></button>` : ''}
+                ${isAdmin ? `<button onclick="event.stopPropagation(); deleteVideo('${fileName}')" class="absolute top-10 right-6 bg-[#F2B8B5] text-[#601410] px-5 py-2 rounded-full text-xs font-bold z-50 shadow-xl flex items-center"><span class="material-symbols-rounded" style="font-size: 18px;">delete</span></button>` : ''}
             `;
             feed.appendChild(section);
         }
 
         function setupObserver() {
             const obs = new IntersectionObserver((entries) => {
+                // [핵심] 루프 중에는 감지 로직 무시
+                if (isAutoLooping) return;
+
                 entries.forEach(entry => {
                     const v = entry.target.querySelector('video');
                     if (!v) return;
 
-                    // [수정] threshold를 높여 확실히 보일 때만 작동하도록 함 (튕김 방지)
                     if (entry.isIntersecting && entry.intersectionRatio >= 0.8) {
                         if (!v.src) v.src = v.getAttribute('data-src');
                         currentVideoData.url = v.getAttribute('data-src');
@@ -127,19 +107,9 @@
                         v.pause();
                     }
                 });
-            }, { 
-                threshold: [0, 0.8], // 80% 기준점 추가
-                rootMargin: "0px"
-            });
+            }, { threshold: [0.8] });
             document.querySelectorAll('.video-section').forEach(s => obs.observe(s));
         }
-
-        // 스크롤 중임을 감지하여 튕김 현상 억제
-        document.getElementById('feed').addEventListener('scroll', () => {
-            isScrolling = true;
-            clearTimeout(window.scrollTimeout);
-            window.scrollTimeout = setTimeout(() => { isScrolling = false; }, 150);
-        });
 
         function vHandleTouch(v) { 
             if (isGlobalMuted) unlockAudio();
@@ -154,11 +124,30 @@
         }
 
         function autoNext(v) {
-            // [수정] 수동 스크롤 중에는 자동 넘기기 방지하여 꼬임 현상 제거
-            if (isScrolling) return;
-            const next = v.closest('.video-section').nextElementSibling;
-            if (next) next.scrollIntoView({ behavior: 'smooth' });
-            else document.querySelector('.video-section').scrollIntoView({ behavior: 'smooth' });
+            const current = v.closest('.video-section');
+            const next = current.nextElementSibling;
+            
+            if (next) {
+                next.scrollIntoView({ behavior: 'smooth' });
+            } else {
+                // [오류 해결 로직]
+                isAutoLooping = true; // 감지기 잠금
+                const container = document.getElementById('feed');
+                
+                // 처음으로 갈 때는 '부드러운 효과' 없이 즉시 이동 (중간 영상 감지 방지)
+                container.scrollTo({ top: 0, behavior: 'auto' });
+                
+                // 이동 후 아주 잠깐의 지연을 준 뒤 잠금 해제
+                setTimeout(() => {
+                    isAutoLooping = false;
+                    // 첫 영상 재생 강제 실행
+                    const firstVideo = document.querySelector('.video-section video');
+                    if (firstVideo) {
+                        firstVideo.currentTime = 0;
+                        firstVideo.play();
+                    }
+                }, 100);
+            }
         }
 
         async function vDownloadCurrent() {
@@ -173,7 +162,7 @@
         async function uploadVideo() {
             const i = document.getElementById('videoInput'); if (!i.files[0]) return;
             const b = document.getElementById('uploadBtn'); const s = document.getElementById('status');
-            b.disabled = true; s.innerText = "Uploading...";
+            b.disabled = true; s.innerText = "Processing...";
             const ext = i.files[0].name.split('.').pop();
             const { error } = await s_client.storage.from('videos').upload(`v_${Date.now()}.${ext}`, i.files[0]);
             if (error) { alert(error.message); b.disabled = false; } else location.reload();
