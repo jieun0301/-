@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>My Private Reel</title>
+    <title>릴스우루</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -221,8 +221,8 @@
             if (error) { alert(error.message); b.disabled = false; } else location.reload();
         }
 
-        async function deleteVideo(n) { if (confirm("Delete?")) { await s_client.storage.from('videos').remove([n]); location.reload(); } }
-        function checkAdmin() { if (prompt("Password?") === "0000") { isAdmin = true; document.getElementById('uploadModal').style.display = 'flex'; loadVideos(); } }
+        async function deleteVideo(n) { if (confirm("삭제하시겠습니까?")) { await s_client.storage.from('videos').remove([n]); location.reload(); } }
+        function checkAdmin() { if (prompt("관리자 비밀번호 입력") === "3256") { isAdmin = true; document.getElementById('uploadModal').style.display = 'flex'; loadVideos(); } }
         function closeModal() { document.getElementById('uploadModal').style.display = 'none'; }
         
         loadVideos();
